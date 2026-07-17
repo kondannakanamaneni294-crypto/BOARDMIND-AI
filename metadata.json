@@ -1,0 +1,8 @@
+{
+  "name": "Remix: BoardMind AI",
+  "description": "The AI Executive Boardroom - One Question. Eleven AI Executives. One Smart Decision.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

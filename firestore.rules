@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net (default deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =======================================================
+    // HARDENED SECURITY PRIMITIVES & HELPER FUNCTIONS
+    // =======================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // =======================================================
+    // ENTITY VALIDATION BLUEPRINTS (ANTI-UPDATE GAP)
+    // =======================================================
+    function isValidUser(data) {
+      return data.uid is string && data.uid == request.auth.uid
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100;
+    }
+
+    function isValidCompany(data) {
+      return data.id is string && isValidId(data.id)
+        && data.ownerUid is string && data.ownerUid == request.auth.uid
+        && data.companyName is string && data.companyName.size() <= 200
+        && data.industry is string && data.industry.size() <= 100
+        && data.country is string && data.country.size() <= 100
+        && data.employees is int && data.employees >= 0
+        && data.annualRevenue is int && data.annualRevenue >= 0;
+    }
+
+    function isValidMeeting(data) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == request.auth.uid
+        && (data.companyId == null || (data.companyId is string && isValidId(data.companyId)))
+        && data.challenge is string && data.challenge.size() <= 2000
+        && data.status is string && data.status.size() <= 50;
+    }
+
+    function isValidDecision(data) {
+      return data.id is string && isValidId(data.id)
+        && data.meetingId is string && isValidId(data.meetingId)
+        && data.executiveSummary is string && data.executiveSummary.size() <= 5000
+        && data.businessHealthScore is int && data.businessHealthScore >= 0 && data.businessHealthScore <= 100
+        && data.businessStrategy is string && data.businessStrategy.size() <= 2000;
+    }
+
+    // =======================================================
+    // MASTER SECURED COLLECTION MATCH PATHS
+    // =======================================================
+
+    // Collection: Users (Isolated PII - strict isOwner checking)
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming())
+                    && incoming().uid == existing().uid
+                    && incoming().email == existing().email;
+      allow delete: if false; // Master profiles are permanent
+    }
+
+    // Collection: Companies (Demographics and Financials)
+    match /companies/{companyId} {
+      allow get: if isSignedIn() && existing().ownerUid == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(companyId) && isValidCompany(incoming());
+      allow update: if isSignedIn() && isValidId(companyId) && isValidCompany(incoming())
+                    && existing().ownerUid == request.auth.uid
+                    && incoming().ownerUid == existing().ownerUid;
+      allow delete: if isSignedIn() && existing().ownerUid == request.auth.uid;
+    }
+
+    // Collection: Executive Meetings (Past and Active Sessions)
+    match /executive_meetings/{meetingId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(meetingId) && isValidMeeting(incoming());
+      allow update: if isSignedIn() && isValidId(meetingId) && isValidMeeting(incoming())
+                    && existing().userId == request.auth.uid
+                    && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+
+      // Sub-collection: Board Decisions (The Master Gate Pattern)
+      match /board_decisions/{decisionId} {
+        allow get: if isSignedIn() && get(/databases/$(database)/documents/executive_meetings/$(meetingId)).data.userId == request.auth.uid;
+        allow list: if isSignedIn() && get(/databases/$(database)/documents/executive_meetings/$(meetingId)).data.userId == request.auth.uid;
+        allow create: if isSignedIn() && isValidId(decisionId) && isValidDecision(incoming())
+                      && get(/databases/$(database)/documents/executive_meetings/$(meetingId)).data.userId == request.auth.uid;
+        allow update: if isSignedIn() && isValidId(decisionId) && isValidDecision(incoming())
+                      && get(/databases/$(database)/documents/executive_meetings/$(meetingId)).data.userId == request.auth.uid;
+        allow delete: if isSignedIn() && get(/databases/$(database)/documents/executive_meetings/$(meetingId)).data.userId == request.auth.uid;
+      }
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "users": {
+      "title": "users",
+      "description": "User profiles for authenticated business leaders",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "companies": {
+      "title": "companies",
+      "description": "Company registration and demographic data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerUid": { "type": "string" },
+        "companyName": { "type": "string" },
+        "industry": { "type": "string" },
+        "country": { "type": "string" },
+        "employees": { "type": "integer" },
+        "annualRevenue": { "type": "integer" },
+        "yearsInBusiness": { "type": "integer" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "ownerUid", "companyName", "industry", "employees", "annualRevenue"]
+    },
+    "executive_meetings": {
+      "title": "executive_meetings",
+      "description": "Active and past boardroom meetings containing context and responses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "companyId": { "type": "string" },
+        "challenge": { "type": "string" },
+        "interviewAnswers": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "userId", "challenge", "status"]
+    },
+    "board_decisions": {
+      "title": "board_decisions",
+      "description": "CEO final decisions and combined insights",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "executiveSummary": { "type": "string" },
+        "businessHealthScore": { "type": "integer" },
+        "riskScore": { "type": "integer" },
+        "growthScore": { "type": "integer" },
+        "confidenceScore": { "type": "integer" },
+        "priorityActions": { "type": "array" },
+        "businessStrategy": { "type": "string" },
+        "expectedOutcome": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "meetingId", "executiveSummary", "businessHealthScore", "businessStrategy"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User master profiles"
+    },
+    "/companies/{companyId}": {
+      "schema": "companies",
+      "description": "Company demographics and financials"
+    },
+    "/executive_meetings/{meetingId}": {
+      "schema": "executive_meetings",
+      "description": "Simulated board sessions and logs"
+    },
+    "/executive_meetings/{meetingId}/board_decisions/{decisionId}": {
+      "schema": "board_decisions",
+      "description": "Final executive decisions synthesized per meeting"
+    }
+  }
+}
